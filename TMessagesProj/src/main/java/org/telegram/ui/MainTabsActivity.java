@@ -632,6 +632,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private boolean canScrollInternal(MotionEvent ev, boolean forward) {
+        if (NekoConfig.hideBottomNavigationBar) {
+            return false;
+        }
         final BaseFragment fragment = getCurrentVisibleFragment();
         if (fragment instanceof TabFragmentDelegate) {
             final TabFragmentDelegate delegate = (TabFragmentDelegate) fragment;
@@ -901,7 +904,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private boolean accountSwitchHintShown;
 
     private void showAccountChangeHint() {
-        if (accountSwitchHintShown) return;
+        if (accountSwitchHintShown || NekoConfig.hideBottomNavigationBar) return;
 
         if (accountSwitchHint == null && MessagesController.getGlobalMainSettings().getInt("accountswitchhint", 0) < 2) {
             AndroidUtilities.runOnUIThread(() -> {
