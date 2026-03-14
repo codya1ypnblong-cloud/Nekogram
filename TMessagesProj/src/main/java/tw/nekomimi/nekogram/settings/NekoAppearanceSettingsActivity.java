@@ -163,7 +163,7 @@ public class NekoAppearanceSettingsActivity extends BaseNekoSettingsActivity imp
             if (view instanceof TextCheckCell) {
                 ((TextCheckCell) view).setChecked(NekoConfig.hideBottomNavigationBar);
             }
-            showRestartBulletin();
+            parentLayout.rebuildAllFragmentViews(false, false);
         }
     }
 

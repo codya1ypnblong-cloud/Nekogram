@@ -25,6 +25,8 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.ActionBarMenu;
+import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
@@ -59,6 +61,7 @@ public abstract class BaseNekoSettingsActivity extends BaseFragment {
     protected LinearLayoutManager layoutManager;
     protected Theme.ResourcesProvider resourcesProvider;
     protected View actionBarBackground;
+    protected ActionBarMenuItem searchItem;
 
     protected int rowId = 1;
 
@@ -202,8 +205,6 @@ public abstract class BaseNekoSettingsActivity extends BaseFragment {
         contentView.addView(actionBarBackground, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 200, Gravity.TOP));
         contentView.addView(actionBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
 
-        listView.adapter.update(false);
-
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -216,8 +217,23 @@ public abstract class BaseNekoSettingsActivity extends BaseFragment {
         return fragmentView = contentView;
     }
 
+    protected void createSearchItem(ActionBarMenu menu, ActionBarMenuItem.ActionBarMenuItemSearchListener searchListener) {
+        searchItem = menu.addItem(0, R.drawable.outline_header_search, resourceProvider).setIsSearchField(true).setActionBarMenuItemSearchListener(searchListener);
+        searchItem.setSearchFieldHint(LocaleController.getString(R.string.Search));
+        searchItem.setContentDescription(LocaleController.getString(R.string.Search));
+    }
+
     protected boolean isSearchFieldVisible() {
-        return false;
+        return searchItem != null && searchItem.isSearchFieldVisible2();
+    }
+
+    @Override
+    public boolean onBackPressed(boolean invoked) {
+        if (isSearchFieldVisible()) {
+            if (invoked) actionBar.closeSearchField();
+            return false;
+        }
+        return super.onBackPressed(invoked);
     }
 
     private boolean actionBarVisible;
@@ -408,7 +424,8 @@ public abstract class BaseNekoSettingsActivity extends BaseFragment {
             return;
         }
 
-        iBlur3PositionActionBar.set(0, 0, fragmentView.getMeasuredWidth(), actionBar.getMeasuredHeight());
+        final int additionalList = AndroidUtilities.dp(48);
+        iBlur3PositionActionBar.set(0, -additionalList, fragmentView.getMeasuredWidth(), actionBar.getMeasuredHeight() + additionalList);
 
         scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, 1);
         scrollableViewNoiseSuppressor.invalidateResultRenderNodes(iBlur3Capture, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());

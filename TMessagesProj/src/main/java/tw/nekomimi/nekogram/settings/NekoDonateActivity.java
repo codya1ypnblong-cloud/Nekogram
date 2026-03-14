@@ -1,16 +1,9 @@
 package tw.nekomimi.nekogram.settings;
 
-import static org.telegram.messenger.AndroidUtilities.dp;
-
-import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Outline;
-import android.graphics.drawable.ColorDrawable;
-import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -18,11 +11,9 @@ import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingClientStateListener;
@@ -48,15 +39,15 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Cells.DialogCell;
 import org.telegram.ui.Components.BulletinFactory;
-import org.telegram.ui.Components.ColoredImageSpan;
 import org.telegram.ui.Components.FlickerLoadingView;
 import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.TextHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.LaunchActivity;
+import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -207,10 +198,10 @@ public class NekoDonateActivity extends BaseNekoSettingsActivity implements Purc
     @Override
     protected boolean onItemLongClick(UItem item, View view, int position, float x, float y) {
         var id = item.id;
-        if (id > cryptoRow) {
+        if (id >= cryptoRow) {
             ConfigHelper.Crypto crypto = cryptos.get(id - cryptoRow);
             ItemOptions.makeOptions(this, view)
-                    .setScrimViewBackground(new ColorDrawable(getThemedColor(Theme.key_windowBackgroundWhite)))
+                    .setScrimViewBackground(listView.getClipBackground(view))
                     .add(R.drawable.msg_qrcode, LocaleController.getString(R.string.GetQRCode), () -> QRCodeBottomSheet.showForCrypto(this, crypto))
                     .add(R.drawable.msg_copy, LocaleController.getString(R.string.Copy), () -> {
                         AndroidUtilities.addToClipboard(crypto.address);
@@ -264,97 +255,55 @@ public class NekoDonateActivity extends BaseNekoSettingsActivity implements Purc
         private QRCodeBottomSheet(Context context, ConfigHelper.Crypto crypto, Theme.ResourcesProvider resourcesProvider) {
             super(context, false, resourcesProvider);
 
-            fixNavigationBar();
-            setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+            fixNavigationBar(getThemedColor(Theme.key_windowBackgroundGray));
+            setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
 
             var linearLayout = new LinearLayout(context);
-            linearLayout.setPadding(dp(12), dp(12), dp(12), dp(12));
             linearLayout.setOrientation(LinearLayout.VERTICAL);
 
-            var titleView = new TextView(context);
-            titleView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
-            titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
-            titleView.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
+            var titleView = TextHelper.makeTextView(context, 20, Theme.key_windowBackgroundWhiteBlackText, true);
             titleView.setText(crypto.currency);
-            linearLayout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL));
+            linearLayout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 6, 0, 0));
 
-            var subTitleView = new TextView(context);
-            subTitleView.setTextColor(getThemedColor(Theme.key_dialogTextGray2));
-            subTitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            var subTitleView = TextHelper.makeTextView(context, 14, Theme.key_windowBackgroundWhiteGrayText, false);
             subTitleView.setText(crypto.chain);
-            linearLayout.addView(subTitleView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 8));
+            linearLayout.addView(subTitleView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 6, 0, 6));
+
+            var imageContainer = new LinearLayout(context);
+            imageContainer.setOrientation(LinearLayout.VERTICAL);
+            imageContainer.setGravity(Gravity.CENTER_HORIZONTAL);
+            imageContainer.setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8), AndroidUtilities.dp(8));
+            imageContainer.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(16), Theme.getColor(Theme.key_windowBackgroundWhite)));
+            linearLayout.addView(imageContainer, LayoutHelper.createLinear(220 + 16, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 18, 0, 18, 0));
 
             var imageView = new ImageView(context);
             imageView.setScaleType(ImageView.ScaleType.FIT_XY);
             imageView.setOutlineProvider(new ViewOutlineProvider() {
                 @Override
                 public void getOutline(View view, Outline outline) {
-                    outline.setRoundRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), dp(12));
+                    outline.setRoundRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), AndroidUtilities.dp(12));
                 }
             });
             imageView.setClipToOutline(true);
             imageView.setImageBitmap(createQR(crypto.address));
-            linearLayout.addView(imageView, LayoutHelper.createLinear(220, 220, Gravity.CENTER_HORIZONTAL, 18, 0, 18, 0));
+            imageContainer.addView(imageView, LayoutHelper.createLinear(220, 220));
 
             View.OnClickListener copy = (v) -> {
                 AndroidUtilities.addToClipboard(crypto.address);
-                BulletinFactory.of(container, resourcesProvider).createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
+                getBulletinFactory().createCopyBulletin(LocaleController.getString(R.string.TextCopied)).show();
             };
 
-            var addressView = new TextView(context);
-            addressView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            var addressView = TextHelper.makeTextView(context, 12, Theme.key_windowBackgroundWhiteGrayText, false);
             addressView.setText(crypto.address);
-            addressView.setTextColor(getThemedColor(Theme.key_dialogTextGray2));
-            addressView.setPadding(dp(4), dp(4), dp(4), dp(4));
+            addressView.setPadding(AndroidUtilities.dp(4), AndroidUtilities.dp(4), AndroidUtilities.dp(4), AndroidUtilities.dp(4));
             addressView.setBackground(Theme.createRadSelectorDrawable(getThemedColor(Theme.key_listSelector), 8, 8));
             addressView.setOnClickListener(copy);
-            linearLayout.addView(addressView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 4, 0, 4));
+            imageContainer.addView(addressView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
 
-            var horizontalView = new LinearLayout(context);
-            horizontalView.setOrientation(LinearLayout.HORIZONTAL);
-
-            var copyView = new TextView(context);
-            copyView.setTextColor(getThemedColor(Theme.key_featuredStickers_buttonText));
-            copyView.setGravity(Gravity.CENTER);
-            SpannableStringBuilder spannableStringBuilder = new SpannableStringBuilder();
-            spannableStringBuilder.append("..").setSpan(new ColoredImageSpan(ContextCompat.getDrawable(context, R.drawable.msg_copy_filled)), 0, 1, 0);
-            spannableStringBuilder.setSpan(new DialogCell.FixedWidthSpan(dp(6)), 1, 2, 0);
-            spannableStringBuilder.append(LocaleController.getString(R.string.Copy));
-            copyView.setText(spannableStringBuilder);
-            copyView.setPadding(dp(8), 0, dp(8), 0);
-            copyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            copyView.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
-            copyView.setSingleLine(true);
-            copyView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(8), getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButtonPressed)));
+            var copyView = new ButtonWithCounterView(context, true, resourcesProvider).setRound();
+            copyView.setText(LocaleController.getString(R.string.Copy), false);
             copyView.setOnClickListener(copy);
-            horizontalView.addView(copyView, LayoutHelper.createLinear(0, 42, 1f, 0, 4, 0, 4, 0));
-
-            var shareView = new TextView(context);
-            shareView.setTextColor(getThemedColor(Theme.key_featuredStickers_buttonText));
-            shareView.setGravity(Gravity.CENTER);
-            spannableStringBuilder = new SpannableStringBuilder();
-            spannableStringBuilder.append("..").setSpan(new ColoredImageSpan(ContextCompat.getDrawable(context, R.drawable.msg_share_filled)), 0, 1, 0);
-            spannableStringBuilder.setSpan(new DialogCell.FixedWidthSpan(dp(6)), 1, 2, 0);
-            spannableStringBuilder.append(LocaleController.getString(R.string.ShareFile));
-            shareView.setText(spannableStringBuilder);
-            shareView.setPadding(dp(8), 0, dp(8), 0);
-            shareView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            shareView.setTypeface(AndroidUtilities.getTypeface(AndroidUtilities.TYPEFACE_ROBOTO_MEDIUM));
-            shareView.setSingleLine(true);
-            shareView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(8), getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButtonPressed)));
-            shareView.setOnClickListener(v -> {
-                Intent intent = new Intent(Intent.ACTION_SEND);
-                intent.setType("text/plain");
-                intent.putExtra(Intent.EXTRA_TEXT, crypto.address);
-                try {
-                    context.startActivity(Intent.createChooser(intent, LocaleController.getString(R.string.ShareFile)));
-                } catch (ActivityNotFoundException e) {
-                    FileLog.e(e);
-                }
-            });
-            horizontalView.addView(shareView, LayoutHelper.createLinear(0, 42, 1f, 4, 0, 4, 0));
-
-            linearLayout.addView(horizontalView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM, 0, 8, 0, 0));
+            linearLayout.addView(copyView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 16, 16, 16, 16));
 
             var scrollView = new ScrollView(context);
             scrollView.addView(linearLayout);

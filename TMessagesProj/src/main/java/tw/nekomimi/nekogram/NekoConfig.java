@@ -11,7 +11,6 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.FileLog;
-import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 
 import java.util.ArrayList;
@@ -145,7 +144,7 @@ public class NekoConfig {
 
     public static boolean shouldNOTTrustMe = false;
 
-    public static boolean isChineseUser = false;
+    public static int userMcc = 0;
 
     private static final SharedPreferences.OnSharedPreferenceChangeListener listener = (preferences, key) -> {
         var map = new HashMap<String, String>(1);
@@ -165,7 +164,7 @@ public class NekoConfig {
             if (configLoaded && !force) {
                 return;
             }
-            isChineseUser = ApplicationLoader.applicationContext.getResources().getBoolean(R.bool.isChineseUser);
+            userMcc = ApplicationLoader.applicationContext.getResources().getConfiguration().mcc;
 
             SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
             preferIPv6 = preferences.getBoolean("preferIPv6", false);
@@ -175,13 +174,13 @@ public class NekoConfig {
             showAddToSavedMessages = preferences.getBoolean("showAddToSavedMessages", true);
             showSetReminder = preferences.getBoolean("showSetReminder", false);
             showReport = preferences.getBoolean("showReport", false);
-            showPrPr = preferences.getBoolean("showPrPr", isChineseUser);
+            showPrPr = preferences.getBoolean("showPrPr", false);
             showDeleteDownloadedFile = preferences.getBoolean("showDeleteDownloadedFile", false);
             showMessageDetails = preferences.getBoolean("showMessageDetails", false);
             showTranslate = preferences.getBoolean("showTranslate", true);
             showRepeat = preferences.getBoolean("showRepeat", true);
             stickerSize = preferences.getFloat("stickerSize", 14.0f);
-            translationProvider = preferences.getString("translationProvider2", isChineseUser ? Translator.PROVIDER_LINGO : Translator.PROVIDER_GOOGLE);
+            translationProvider = preferences.getString("translationProvider2", Translator.PROVIDER_GOOGLE);
             openArchiveOnPull = preferences.getBoolean("openArchiveOnPull", false);
             hideKeyboardOnChatScroll = preferences.getBoolean("hideKeyboardOnChatScroll", false);
             useSystemEmoji = preferences.getBoolean("useSystemEmoji", false);
@@ -197,7 +196,7 @@ public class NekoConfig {
             idType = preferences.getInt("idType", ID_TYPE_API);
             autoPauseVideo = preferences.getBoolean("autoPauseVideo", true);
             disableProximityEvents = preferences.getBoolean("disableProximityEvents", false);
-            mapDriftingFix = preferences.getBoolean("mapDriftingFix", isChineseUser);
+            mapDriftingFix = preferences.getBoolean("mapDriftingFix", userMcc == 460);
             voiceEnhancements = preferences.getBoolean("voiceEnhancements", false);
             disableInstantCamera = preferences.getBoolean("disableInstantCamera", false);
             tryToOpenAllLinksInIV = preferences.getBoolean("tryToOpenAllLinksInIV", false);
@@ -251,7 +250,7 @@ public class NekoConfig {
             if (!configLoaded) {
                 var map = new HashMap<String, String>();
                 map.put("buildType", BuildConfig.BUILD_TYPE);
-                map.put("isChineseUser", String.valueOf(isChineseUser));
+                map.put("mcc", String.valueOf(userMcc));
                 AnalyticsHelper.trackEvent("load_config", map);
             }
             configLoaded = true;

@@ -96,7 +96,7 @@ public class UserHelper extends BaseController {
             callback.accept(user);
             return;
         }
-        searchUser(userId, callback, null);
+        searchUser(userId, callback, null, false);
     }
 
     public void searchChat(long chatId, Consumer<TLRPC.Chat> callback) {
@@ -105,7 +105,7 @@ public class UserHelper extends BaseController {
             callback.accept(chat);
             return;
         }
-        searchChat(chatId, callback, null);
+        searchChat(chatId, callback, null, false);
     }
 
     void resolveUser(String username, long userId, Consumer<TLRPC.User> callback) {
@@ -127,42 +127,38 @@ public class UserHelper extends BaseController {
         }));
     }
 
-    private void searchUser(long userId, Consumer<TLRPC.User> callback, ParsedPeer fallback) {
-        searchPeer(Extra.getUserInfoBot(fallback != null), userId, fakeUser -> {
-            if (fakeUser == null) {
-                callback.accept(fallback != null ? fallback.toUser() : null);
-                return;
-            }
+    private void searchUser(long userId, Consumer<TLRPC.User> callback, ParsedPeer parsedPeer, boolean fallback) {
+        searchPeer(Extra.getUserInfoBot(fallback), userId, String.valueOf(userId), fakeUser -> {
             var user = getMessagesController().getUser(userId);
             if (user != null) {
                 callback.accept(user);
-            } else if (fallback != null) {
-                callback.accept(fallback.toUser());
+            } else if (parsedPeer != null) {
+                callback.accept(parsedPeer.toUser());
+            } else if (!fallback) {
+                searchUser(userId, callback, fakeUser, true);
             } else {
-                searchUser(userId, callback, fakeUser);
+                callback.accept(null);
             }
         });
     }
 
-    private void searchChat(long chatId, Consumer<TLRPC.Chat> callback, ParsedPeer fallback) {
-        searchPeer(Extra.getUserInfoBot(fallback != null), -1000000000000L - chatId, fakeChat -> {
-            if (fakeChat == null) {
-                callback.accept(null);
-                return;
-            }
-            var chat = getMessagesController().getChat(fakeChat.id);
+    private void searchChat(long chatId, Consumer<TLRPC.Chat> callback, ParsedPeer parsedPeer, boolean fallback) {
+        searchPeer(Extra.getUserInfoBot(fallback), chatId, String.valueOf(-1000000000000L - chatId), fakeChat -> {
+            var chat = getMessagesController().getChat(chatId);
             if (chat != null) {
                 callback.accept(chat);
-            } else if (fallback != null) {
-                callback.accept(fallback.toChat());
+            } else if (parsedPeer != null) {
+                callback.accept(parsedPeer.toChat());
+            } else if (!fallback) {
+                searchChat(chatId, callback, fakeChat, true);
             } else {
-                searchChat(chatId, callback, fakeChat);
+                callback.accept(null);
             }
         });
     }
 
-    private void searchPeer(UserInfoBot botInfo, long id, Consumer<ParsedPeer> callback) {
-        getInlineBotHelper().query(botInfo, String.valueOf(id), (results, error) -> {
+    private void searchPeer(UserInfoBot botInfo, long id, String query, Consumer<ParsedPeer> callback) {
+        getInlineBotHelper().query(botInfo, query, (results, error) -> {
             if (results == null || results.isEmpty()) {
                 callback.accept(null);
                 return;

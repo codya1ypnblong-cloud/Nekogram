@@ -9,7 +9,10 @@
 package org.telegram.ui;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.AndroidUtilities.replaceSingleLinkBold;
 import static org.telegram.messenger.LocaleController.formatPluralString;
+import static org.telegram.messenger.LocaleController.formatString;
+import static org.telegram.messenger.LocaleController.getString;
 import static org.telegram.ui.Components.Premium.LimitReachedBottomSheet.TYPE_BOOSTS_FOR_USERS;
 
 import android.Manifest;
@@ -194,7 +197,6 @@ import org.telegram.ui.Components.Premium.boosts.UserSelectorBottomSheet;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Components.SearchTagsList;
-import org.telegram.ui.Components.SharedMediaLayout;
 import org.telegram.ui.Components.SharingLocationsAlert;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.StickerSetBulletinLayout;
@@ -249,13 +251,8 @@ import java.util.zip.ZipInputStream;
 import tw.nekomimi.nekogram.Extra;
 import tw.nekomimi.nekogram.forward.ForwardContext;
 import tw.nekomimi.nekogram.NekoConfig;
-import tw.nekomimi.nekogram.helpers.ApkInstaller;
 import tw.nekomimi.nekogram.helpers.MonetHelper;
-import tw.nekomimi.nekogram.helpers.SettingsHelper;
-import tw.nekomimi.nekogram.helpers.UserHelper;
 import tw.nekomimi.nekogram.helpers.remote.UpdateHelper;
-import tw.nekomimi.nekogram.settings.NekoDonateActivity;
-import tw.nekomimi.nekogram.settings.NekoSettingsActivity;
 
 public class LaunchActivity extends BasePermissionsActivity implements INavigationLayout.INavigationLayoutDelegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate, IPipActivity {
     public final static String EXTRA_FORCE_NOT_INTERNAL_APPS = "force_not_internal_apps";
@@ -1127,6 +1124,10 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     mode = chatActivity.isShouldHaveLightNavigationBarIcons() ? 2 : 1;
                 }
 
+                if (getBottomSheetTabs() != null && getBottomSheetTabs().getHeight(false) > 0) {
+                    mode = 0;
+                }
+
                 if (actionBarLayout.getSheetFragment(false) != null) {
                     BaseFragment sheetFragment = actionBarLayout.getSheetFragment(false);
                     if (sheetFragment.sheetsStack != null) {
@@ -1523,7 +1524,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         boolean pushOpened = false;
         long push_user_id = 0;
         long push_chat_id = 0;
-        long profile_dialog_id = 0;
         long[] push_story_dids = null;
         int push_story_id = -1;
         long push_topic_id = 0;
@@ -2055,14 +2055,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                                 conferenceSlug = path.replace("call/", "");
                                             } else if (path.startsWith("addemoji/")) {
                                                 emoji = path.replace("addemoji/", "");
-                                            } else if (path.startsWith("nekosettings/")) {
-                                                SettingsHelper.processDeepLink(data, fragment -> {
-                                                    AndroidUtilities.runOnUIThread(() -> presentFragment(fragment, false, false));
-                                                    if (AndroidUtilities.isTablet()) {
-                                                        actionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                                                        rightActionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                                                    }
-                                                }, () -> showBulletin(factory -> factory.createErrorBulletin(LocaleController.getString(R.string.UnknownNekoSettingsOption))), null);
                                             } else if (path.startsWith("msg/") || path.startsWith("share/")) {
                                                 message = data.getQueryParameter("url");
                                                 if (message == null) {
@@ -2509,26 +2501,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                         if (intCode != 0) {
                                             code = "" + intCode;
                                         }
-                                    } else if (url.startsWith("tg:user") || url.startsWith("tg://user")) {
-                                        url = url.replace("tg:user", "tg://telegram.org").replace("tg://user", "tg://telegram.org");
-                                        data = Uri.parse(url);
-                                        String userID = data.getQueryParameter("id");
-                                        if (userID != null) {
-                                            try {
-                                                profile_dialog_id = Long.parseLong(userID);
-                                            } catch (NumberFormatException ignore) {
-                                            }
-                                        }
-                                    } else if (url.startsWith("tg:chat") || url.startsWith("tg://chat")) {
-                                        url = url.replace("tg:chat", "tg://telegram.org").replace("tg://chat", "tg://telegram.org");
-                                        data = Uri.parse(url);
-                                        String chatID = data.getQueryParameter("id");
-                                        if (chatID != null) {
-                                            try {
-                                                profile_dialog_id = -Long.parseLong(chatID);
-                                            } catch (NumberFormatException ignore) {
-                                            }
-                                        }
                                     } else if (url.startsWith("tg:openmessage") || url.startsWith("tg://openmessage")) {
                                         url = url.replace("tg:openmessage", "tg://telegram.org").replace("tg://openmessage", "tg://telegram.org");
                                         data = Uri.parse(url);
@@ -2605,19 +2577,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                         } else {
                                             open_settings = 1;
                                         }
-                                    } else if (
-                                            url.startsWith("tg:meow") || url.startsWith("tg://meow") || url.startsWith("tg:nya") || url.startsWith("tg://nya") ||
-                                            url.startsWith("tg:upgrade") || url.startsWith("tg://upgrade") || url.startsWith("tg:update") || url.startsWith("tg://update")
-                                    ) {
-                                        url = url.replace("tg://", "//t.me/").replace("tg:", "//t.me/");
-                                        data = Uri.parse(url);
-                                        SettingsHelper.processDeepLink(data, fragment -> {
-                                            AndroidUtilities.runOnUIThread(() -> presentFragment(fragment, false, false));
-                                            if (AndroidUtilities.isTablet()) {
-                                                actionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                                                rightActionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                                            }
-                                        }, () -> showBulletin(factory -> factory.createErrorBulletin(LocaleController.getString(R.string.UnknownNekoSettingsOption))), progress);
                                     } else if ((url.startsWith("tg:search") || url.startsWith("tg://search"))) {
                                         url = url.replace("tg:search", "tg://telegram.org").replace("tg://search", "tg://telegram.org");
                                         data = Uri.parse(url);
@@ -2874,7 +2833,33 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     int encId = intent.getIntExtra("encId", 0);
                     int widgetId = intent.getIntExtra("appWidgetId", 0);
                     long topicId = intent.getLongExtra("topicId", 0);
-                    if (widgetId != 0) {
+                    final String oauth_url = intent.getStringExtra("oauth_url");
+                    if (oauth_url != null) {
+                        final TLRPC.TL_messages_requestUrlAuth req = new TLRPC.TL_messages_requestUrlAuth();
+                        req.url = oauth_url;
+                        req.flags |= 4;
+                        ConnectionsManager.getInstance(intentAccount[0]).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+                            final BaseFragment fragment = getSafeLastFragment();
+                            if (response != null) {
+                                if (response instanceof TLRPC.TL_urlAuthResultRequest) {
+                                    OAuthSheet.handle(false, currentAccount, req, (TLRPC.TL_urlAuthResultRequest) response);
+                                } else if (response instanceof TLRPC.TL_urlAuthResultAccepted) {
+                                    OAuthSheet.handle(false, currentAccount, req, (TLRPC.TL_urlAuthResultAccepted) response);
+                                } else if (response instanceof TLRPC.TL_urlAuthResultDefault) {
+                                    AlertsCreator.showOpenUrlAlert(fragment, oauth_url, false, true);
+                                }
+                            } else if (error != null) {
+                                if ("URL_EXPIRED".equalsIgnoreCase(error.text)) {
+                                    OAuthSheet.getBulletinFactory()
+                                        .createSimpleBulletin(R.raw.error, getString(R.string.BotAuthLoggedInFailTitle), getString(R.string.BotAuthLoggedInFailNoDomain))
+                                        .show();
+                                } else {
+                                    OAuthSheet.getBulletinFactory().showForError(error);
+                                }
+                            }
+                        }), ConnectionsManager.RequestFlagFailOnServerErrors);
+                        pushOpened = true;
+                    } else if (widgetId != 0) {
                         open_settings = 6;
                         open_widget_edit = widgetId;
                         open_widget_edit_type = intent.getIntExtra("appWidgetType", 0);
@@ -3015,14 +3000,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     pushOpened = true;
                     LaunchActivity.dismissAllWeb();
                 }
-            } else if (profile_dialog_id != 0) {
-                UserHelper.getInstance(currentAccount).openByDialogId(profile_dialog_id, this, (fragment) -> {
-                    AndroidUtilities.runOnUIThread(() -> presentFragment(fragment, false, false));
-                    if (AndroidUtilities.isTablet()) {
-                        actionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                        rightActionBarLayout.rebuildFragments(INavigationLayout.REBUILD_FLAG_REBUILD_LAST);
-                    }
-                }, progress);
             } else if (showDialogsList) {
                 if (!AndroidUtilities.isTablet()) {
                     actionBarLayout.removeAllFragments();
@@ -3117,10 +3094,6 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     closePrevious = true;
                 } else if (open_settings == 6) {
                     fragment = new EditWidgetActivity(open_widget_edit_type, open_widget_edit);
-                } else if (open_settings == 100) {
-                    fragment = new NekoSettingsActivity();
-                } else if (open_settings == 101) {
-                    fragment = new NekoDonateActivity();
                 } else if (open_settings == 10) {
                     fragment = new LanguageSelectActivity();
                 } else if (open_settings == 11) {

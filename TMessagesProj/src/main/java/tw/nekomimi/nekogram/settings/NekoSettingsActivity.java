@@ -1,7 +1,5 @@
 package tw.nekomimi.nekogram.settings;
 
-import static org.telegram.messenger.LocaleController.getString;
-
 import android.content.Context;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -32,6 +30,7 @@ import org.telegram.ui.Cells.SettingsSearchCell;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FragmentFloatingButton;
+import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -55,7 +54,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
     private final BoolAnimator animatorSearchPageVisible = new BoolAnimator(ANIMATOR_ID_SEARCH_PAGE_VISIBLE,
             this, CubicBezierInterpolator.EASE_OUT_QUINT, 350);
 
-    private final List<ConfigHelper.News> news = ConfigHelper.getNews();
+    private final List<ConfigHelper.News> newsList = new ArrayList<>();
 
     private final int generalRow = rowId++;
     private final int appearanceRow = rowId++;
@@ -72,7 +71,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
 
     private final int sponsorRow = 100;
 
-    private ActionBarMenuItem searchItem, syncItem;
+    private ActionBarMenuItem syncItem;
     private final ArrayList<SearchResult> searchArray = createSearchArray();
     private final ArrayList<CharSequence> resultNames = new ArrayList<>();
     private final ArrayList<SearchResult> searchResults = new ArrayList<>();
@@ -115,7 +114,7 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         var fragmentView = super.createView(context);
 
         var menu = actionBar.createMenu();
-        searchItem = menu.addItem(0, R.drawable.outline_header_search, resourceProvider).setIsSearchField(true).setActionBarMenuItemSearchListener(new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        createSearchItem(menu, new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
 
             @Override
             public void onSearchCollapse() {
@@ -127,8 +126,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
             @Override
             public void onSearchExpand() {
                 animatorSearchPageVisible.setValue(true, true);
-                search("");
                 updateActionBarVisible();
+                search("");
                 listView.adapter.update(true);
             }
 
@@ -137,8 +136,6 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
                 search(editText.getText().toString());
             }
         });
-        searchItem.setSearchFieldHint(getString(R.string.Search));
-        searchItem.setContentDescription(getString(R.string.Search));
         syncItem = menu.addItem(1, R.drawable.cloud_sync);
         syncItem.setContentDescription(LocaleController.getString(R.string.CloudConfig));
         syncItem.setOnClickListener(v -> CloudSettingsHelper.getInstance().showDialog(this));
@@ -152,13 +149,8 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
     }
 
     @Override
-    protected boolean isSearchFieldVisible() {
-        return searchItem != null && searchItem.isSearchFieldVisible2();
-    }
-
-    @Override
     protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        if (searchItem != null && searchItem.isSearchFieldVisible2()) {
+        if (isSearchFieldVisible()) {
             items.add(UItem.asSpace(ActionBar.getCurrentActionBarHeight()));
             fillSearchItems(items);
             return;
@@ -186,10 +178,12 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         items.add(UItem.asButtonSubtext(donateRow, R.drawable.msg_input_like, LocaleController.getString(R.string.Donate), LocaleController.getString(R.string.DonateAbout)).slug("donate"));
         items.add(UItem.asShadow(null));
 
-        if (!news.isEmpty()) {
+        newsList.clear();
+        newsList.addAll(ConfigHelper.getNewsForSettings());
+        if (!newsList.isEmpty()) {
             var newsId = 0;
-            for (var newsItem : news) {
-                items.add(TextDetailSettingsCellFactory.of(sponsorRow + newsId++, newsItem.title, newsItem.summary));
+            for (var news : newsList) {
+                items.add(TextDetailSettingsCellFactory.of(sponsorRow + newsId++, news.title, news.summary));
             }
             items.add(UItem.asShadow(null));
         }
@@ -227,9 +221,29 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
         } else if (id == sourceCodeRow) {
             Browser.openUrl(getParentActivity(), "https://github.com/Nekogram/Nekogram");
         } else if (id >= sponsorRow) {
-            var newsItem = news.get(id - sponsorRow);
-            Browser.openUrl(getParentActivity(), newsItem.url);
+            var news = newsList.get(id - sponsorRow);
+            Browser.openUrl(getParentActivity(), news.url);
         }
+    }
+
+    @Override
+    protected boolean onItemLongClick(UItem item, View view, int position, float x, float y) {
+        var id = item.id;
+        if (id >= sponsorRow) {
+            var news = newsList.get(id - sponsorRow);
+            if (news.id != null) {
+                ItemOptions.makeOptions(this, view)
+                        .setScrimViewBackground(listView.getClipBackground(view))
+                        .add(R.drawable.msg_cancel, LocaleController.getString(R.string.Hide), () -> {
+                            ConfigHelper.removeNews(news.id);
+                            listView.adapter.update(true);
+                        })
+                        .setMinWidth(190)
+                        .show();
+                return true;
+            }
+        }
+        return super.onItemLongClick(item, view, position, x, y);
     }
 
     @Override
@@ -240,15 +254,6 @@ public class NekoSettingsActivity extends BaseNekoSettingsActivity implements Fa
     @Override
     protected String getKey() {
         return "";
-    }
-
-    @Override
-    public boolean onBackPressed(boolean invoked) {
-        if (searchItem.isSearchFieldVisible2()) {
-            if (invoked) actionBar.closeSearchField();
-            return false;
-        }
-        return super.onBackPressed(invoked);
     }
 
     @Override

@@ -6,6 +6,8 @@ import android.text.TextUtils;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildConfig;
@@ -19,6 +21,9 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import tw.nekomimi.nekogram.Extra;
 import tw.nekomimi.nekogram.NekoConfig;
@@ -62,7 +67,7 @@ public abstract class BaseRemoteHelper {
                 " " +
                 LocaleController.getSystemLocaleStringIso639() +
                 " " +
-                NekoConfig.isChineseUser +
+                NekoConfig.userMcc +
                 " " +
                 SharedConfig.pushString;
     }
@@ -120,6 +125,9 @@ public abstract class BaseRemoteHelper {
         if (botInfo == null) {
             return;
         }
+        if (!UserConfig.getInstance(UserConfig.selectedAccount).isClientActivated()) {
+            return;
+        }
         if (loading) return;
         loading = true;
         getInlineBotHelper().query(botInfo,
@@ -136,5 +144,63 @@ public abstract class BaseRemoteHelper {
 
     public interface Delegate {
         void onTLResponse(TLRPC.TL_help_appUpdate res, String error);
+    }
+
+    protected static List<TLRPC.MessageEntity> parseBotAPIEntities(MessageEntity[] botEntities, boolean emojiOnly) {
+        if (botEntities == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(botEntities)
+                .filter(e -> !emojiOnly || e.customEmojiId != null)
+                .map(e -> {
+                    var entity = switch (e.type) {
+                        case "mention" -> new TLRPC.TL_messageEntityMention();
+                        case "hashtag" -> new TLRPC.TL_messageEntityHashtag();
+                        case "cashtag" -> new TLRPC.TL_messageEntityCashtag();
+                        case "bot_command" -> new TLRPC.TL_messageEntityBotCommand();
+                        case "url" -> new TLRPC.TL_messageEntityUrl();
+                        case "email" -> new TLRPC.TL_messageEntityEmail();
+                        case "phone_number" -> new TLRPC.TL_messageEntityPhone();
+                        case "bold" -> new TLRPC.TL_messageEntityBold();
+                        case "italic" -> new TLRPC.TL_messageEntityItalic();
+                        case "underline" -> new TLRPC.TL_messageEntityUnderline();
+                        case "strikethrough" -> new TLRPC.TL_messageEntityStrike();
+                        case "spoiler" -> new TLRPC.TL_messageEntitySpoiler();
+                        //case "blockquote", "expandable_blockquote" -> new TLRPC.TL_messageEntityBlockquote();
+                        //case "code" -> new TLRPC.TL_messageEntityCode();
+                        //case "pre" -> new TLRPC.TL_messageEntityPre();
+                        //case "date_time" -> new TL_messageEntityFormattedDate();
+                        case "text_link" -> new TLRPC.TL_messageEntityTextUrl();
+                        case "custom_emoji" -> {
+                            var emoji = new TLRPC.TL_messageEntityCustomEmoji();
+                            emoji.document_id = e.customEmojiId;
+                            yield emoji;
+                        }
+                        default -> new TLRPC.TL_messageEntityUnknown();
+                    };
+                    entity.offset = e.offset;
+                    entity.length = e.length;
+                    entity.url = e.url;
+                    return entity;
+                })
+                .toList();
+    }
+
+    public static class MessageEntity {
+        @SerializedName("type")
+        @Expose
+        public String type;
+        @SerializedName("offset")
+        @Expose
+        public Integer offset;
+        @SerializedName("length")
+        @Expose
+        public Integer length;
+        @SerializedName("url")
+        @Expose
+        public String url;
+        @SerializedName("custom_emoji_id")
+        @Expose
+        public Long customEmojiId;
     }
 }

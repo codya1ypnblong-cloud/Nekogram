@@ -15,7 +15,6 @@ import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.stream.Collectors;
@@ -126,17 +125,8 @@ public class UpdateHelper extends BaseRemoteHelper {
             update.entities = message.send_message.entities;
             var entities = map.get("entities");
             if (entities != null) {
-                var entities_json = GSON.fromJson(getTextFromInlineResult(entities), Entity[].class);
-                Arrays.stream(entities_json)
-                        .filter(e -> e.customEmojiId != null)
-                        .map(e -> {
-                            var entity = new TLRPC.TL_messageEntityCustomEmoji();
-                            entity.document_id = e.customEmojiId;
-                            entity.offset = e.offset;
-                            entity.length = e.length;
-                            return entity;
-                        })
-                        .forEach(e -> update.entities.add(e));
+                var entities_json = GSON.fromJson(getTextFromInlineResult(entities), MessageEntity[].class);
+                update.entities.addAll(parseBotAPIEntities(entities_json, true));
             }
         }
         var sticker = map.get("sticker");
@@ -165,17 +155,5 @@ public class UpdateHelper extends BaseRemoteHelper {
         @SerializedName("url")
         @Expose
         public String url;
-    }
-
-    public static class Entity {
-        @SerializedName("custom_emoji_id")
-        @Expose
-        public Long customEmojiId;
-        @SerializedName("length")
-        @Expose
-        public Integer length;
-        @SerializedName("offset")
-        @Expose
-        public Integer offset;
     }
 }

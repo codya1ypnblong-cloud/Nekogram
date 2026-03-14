@@ -25,6 +25,10 @@ public class ConfigHelper extends BaseRemoteHelper {
             1715773134L
     );
 
+    private static final int TYPE_NEWS = 0;
+    private static final int TYPE_PROXY = 1;
+    private static final int TYPE_SUGGESTION = 2;
+
     private static final class InstanceHolder {
         private static final ConfigHelper instance = new ConfigHelper();
     }
@@ -53,14 +57,14 @@ public class ConfigHelper extends BaseRemoteHelper {
         return config.cryptos;
     }
 
-    public static List<News> getNews() {
+    private static List<News> getNews() {
         Config config = getInstance().getConfig();
         if (config == null || config.news == null) {
-            return Collections.emptyList();
+            return Extra.getDefaultNews();
         }
         ArrayList<News> newsItems = new ArrayList<>();
         config.news.forEach(news -> {
-            if (news.chineseOnly != null && news.chineseOnly && !NekoConfig.isChineseUser) {
+            if (news.mcc != null && news.mcc != NekoConfig.userMcc) {
                 return;
             }
             if (news.direct != null && news.direct && !Extra.isDirectApp()) {
@@ -78,6 +82,47 @@ public class ConfigHelper extends BaseRemoteHelper {
             newsItems.add(news);
         });
         return newsItems;
+    }
+
+    public static List<News> getNewsForProxy() {
+        return getNews()
+                .stream()
+                .filter(news -> news.type == TYPE_PROXY)
+                .filter(news -> news.id == null || !preferences.getBoolean("news_dismissed_" + news.id, false))
+                .toList();
+    }
+
+    public static List<News> getNewsForSettings() {
+        return getNews()
+                .stream()
+                .filter(news -> news.type == TYPE_NEWS || news.type == TYPE_PROXY)
+                .filter(news -> news.id == null || !preferences.getBoolean("news_dismissed_" + news.id, false))
+                .toList();
+    }
+
+    public static TLRPC.TL_pendingSuggestion getNewsSuggestion() {
+        return getNews()
+                .stream()
+                .filter(news -> news.type == TYPE_SUGGESTION)
+                .filter(news -> news.id == null || !preferences.getBoolean("news_dismissed_" + news.id, false))
+                .findAny()
+                .map(news -> {
+                    var suggestion = new TLRPC.TL_pendingSuggestion();
+                    suggestion.title = new TLRPC.TL_textWithEntities();
+                    suggestion.title.text = news.title;
+                    suggestion.title.entities.addAll(parseBotAPIEntities(news.titleEntities, false));
+                    suggestion.description = new TLRPC.TL_textWithEntities();
+                    suggestion.description.text = news.summary;
+                    suggestion.description.entities.addAll(parseBotAPIEntities(news.summaryEntities, false));
+                    suggestion.url = news.url;
+                    suggestion.suggestion = news.id;
+                    return suggestion;
+                })
+                .orElse(null);
+    }
+
+    public static void removeNews(String id) {
+        preferences.edit().putBoolean("news_dismissed_" + id, true).apply();
     }
 
     private Config config;
@@ -123,12 +168,21 @@ public class ConfigHelper extends BaseRemoteHelper {
     }
 
     public static class News {
+        @SerializedName("id")
+        @Expose
+        public String id;
         @SerializedName("title")
         @Expose
         public String title;
+        @SerializedName("title_entities")
+        @Expose
+        public MessageEntity[] titleEntities;
         @SerializedName("summary")
         @Expose
         public String summary;
+        @SerializedName("summary_entities")
+        @Expose
+        public MessageEntity[] summaryEntities;
         @SerializedName("type")
         @Expose
         public Integer type;
@@ -138,48 +192,21 @@ public class ConfigHelper extends BaseRemoteHelper {
         @SerializedName("language")
         @Expose
         public String language;
-        @SerializedName("chineseOnly")
+        @SerializedName("mcc")
         @Expose
-        public Boolean chineseOnly;
+        public Integer mcc;
         @SerializedName("direct")
         @Expose
         public Boolean direct;
         @SerializedName("source")
         @Expose
         public String source;
-        @SerializedName("maxVersion")
+        @SerializedName("max_version")
         @Expose
         public Integer maxVersion;
-        @SerializedName("minVersion")
+        @SerializedName("min_version")
         @Expose
         public Integer minVersion;
-    }
-
-    public static class ChatOverride {
-        @SerializedName("id")
-        @Expose
-        public long id;
-        @SerializedName("status_emoji_id")
-        @Expose
-        public Long statusEmojiId;
-        @SerializedName("color_id")
-        @Expose
-        public Integer colorId;
-        @SerializedName("background_emoji_id")
-        @Expose
-        public Long backgroundEmojiId;
-        @SerializedName("profile_color_id")
-        @Expose
-        public Integer profileColorId;
-        @SerializedName("profile_background_emoji_id")
-        @Expose
-        public Long profileBackgroundEmojiId;
-        @SerializedName("bot_verification_emoji_id")
-        @Expose
-        public Long botVerificationEmojiId;
-        @SerializedName("bot_verification_description")
-        @Expose
-        public String botVerificationDescription;
     }
 
     public static class Crypto {
@@ -198,12 +225,9 @@ public class ConfigHelper extends BaseRemoteHelper {
         @SerializedName("verify")
         @Expose
         public List<Long> verify;
-        @SerializedName("newsv3")
+        @SerializedName("news")
         @Expose
         public List<News> news;
-        @SerializedName("chat_overrides")
-        @Expose
-        public List<ChatOverride> chatOverrides;
         @SerializedName("cryptos")
         @Expose
         public List<Crypto> cryptos;
